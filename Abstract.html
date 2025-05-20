@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<!-- Abstract.html -->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Upload Abstract</title>
+    <style>
+      body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f0f2f5;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+        position: relative;
+      }
+      .container {
+        background: #ffffff;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+        max-width: 600px;
+        width: 100%;
+        text-align: center;
+        animation: fadeIn 0.6s ease-in-out;
+        z-index: 1;
+      }
+      #loader {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(255, 255, 255, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+      #loader img {
+        width: 80px;
+        height: 80px;
+      }
+      @keyframes fadeIn {
+        0% {
+          opacity: 0;
+          transform: translateY(30px);
+        }
+        100% {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .title {
+        color: #2822c9;
+        font-size: 28px;
+        margin-bottom: 20px;
+        font-weight: 600;
+      }
+      input,
+      textarea,
+      button {
+        width: 90%;
+        padding: 12px;
+        margin-bottom: 18px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 15px;
+        transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      input:focus,
+      textarea:focus {
+        border-color: #2822c9;
+        box-shadow: 0 0 0 2px rgba(40, 34, 201, 0.2);
+        outline: none;
+      }
+      textarea {
+        resize: vertical;
+        height: 160px;
+      }
+      button {
+        background-color: #2822c9;
+        color: white;
+        border: none;
+        font-weight: bold;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+      }
+      button:hover:not(:disabled) {
+        background-color: #1f1ca0;
+      }
+      button:disabled {
+        background-color: #aaa;
+        cursor: not-allowed;
+      }
+      .word-count {
+        font-size: 13px;
+        color: #555;
+        margin-top: -12px;
+        margin-bottom: 18px;
+        text-align: right;
+        width: 90%;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .error-msg {
+        color: red;
+        font-size: 14px;
+        margin-bottom: 10px;
+      }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
+  </head>
+  <body>
+    <div id="loader"><img src="assets/loader.gif" alt="Loading..." /></div>
+    <div class="container" style="display:none">
+      <h2 class="title">Upload Abstract</h2>
+      <form id="abstractForm">
+        <div class="error-msg" id="errorMsg"></div>
+        <input type="text" placeholder="Full Name" id="fullName" required />
+        <input type="email" placeholder="Email" id="email" required />
+        <input type="text" placeholder="Abstract Title" id="title" required />
+
+        <label style="display:block; text-align:left; width:90%; margin:0 auto 10px auto; font-size:14px; color:#555;">Upload Document (.docx, .txt, .pdf, .rtf)</label>
+        <input type="file" id="fileInput" accept=".docx,.txt,.pdf,.rtf" />
+
+        <textarea id="abstractText" placeholder="Type or upload your abstract..."></textarea>
+        <div class="word-count">Word Count: <span id="wordCount">0</span>/700</div>
+
+        <button type="submit" id="submitBtn" disabled>Upload Abstract</button>
+      </form>
+    </div>
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+      import { getFirestore, doc, getDoc, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyA5aolkHTEzDnhF1Zh1sLEqAarRtpZ8oY4",
+        authDomain: "jollybee-2024.firebaseapp.com",
+        projectId: "jollybee-2024",
+        storageBucket: "jollybee-2024.firebasestorage.app",
+        messagingSenderId: "370981953023",
+        appId: "1:370981953023:web:91857e6a3c7d1f33479bca"
+      };
+
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      const fileInput = document.getElementById("fileInput");
+      const textArea = document.getElementById("abstractText");
+      const wordCountEl = document.getElementById("wordCount");
+      const submitBtn = document.getElementById("submitBtn");
+      const form = document.getElementById("abstractForm");
+      const loader = document.getElementById("loader");
+      const container = document.querySelector(".container");
+      const errorMsg = document.getElementById("errorMsg");
+
+      function getWordCount(text) {
+        return text.trim().split(/\s+/).filter(Boolean).length;
+      }
+
+      function updateWordCount() {
+        const count = getWordCount(textArea.value);
+        wordCountEl.textContent = count;
+
+        if (count > 700) {
+          const words = textArea.value.trim().split(/\s+/).slice(0, 700);
+          textArea.value = words.join(" ");
+          wordCountEl.textContent = 700;
+        }
+
+        const newCount = getWordCount(textArea.value);
+        submitBtn.disabled = newCount === 0 || newCount > 700;
+      }
+
+      window.addEventListener("load", () => {
+        setTimeout(() => {
+          loader.style.display = "none";
+          container.style.display = "block";
+        }, 800);
+      });
+
+      textArea.addEventListener("input", updateWordCount);
+
+      fileInput.addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+
+        if (file.name.endsWith(".docx")) {
+          reader.onload = async function (event) {
+            const result = await mammoth.extractRawText({ arrayBuffer: event.target.result });
+            textArea.value = result.value;
+            updateWordCount();
+          };
+          reader.readAsArrayBuffer(file);
+        } else {
+          reader.onload = function (event) {
+            textArea.value = event.target.result;
+            updateWordCount();
+          };
+          reader.readAsText(file);
+        }
+      });
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        loader.style.display = "flex";
+        errorMsg.textContent = "";
+
+        const email = form.email.value;
+        const abstractRef = doc(db, "abstracts", email);
+        const existing = await getDoc(abstractRef);
+
+        if (existing.exists()) {
+          loader.style.display = "none";
+          errorMsg.textContent = "An abstract with this email already exists.";
+          return;
+        }
+
+        await setDoc(abstractRef, {
+          email,
+          fullName: form.fullName.value,
+          title: form.title.value,
+          work: textArea.value,
+          isVerified: false,
+          submittedAt: serverTimestamp(),
+        });
+
+        await new Promise((res) => setTimeout(res, 1200));
+        alert("Your abstract is successfully uploaded.");
+        form.reset();
+        wordCountEl.textContent = "0";
+        submitBtn.innerText = "Upload Abstract";
+        submitBtn.disabled = true;
+        loader.style.display = "none";
+      });
+    </script>
+  </body>
+</html>

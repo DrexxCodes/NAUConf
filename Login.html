@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            0% {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        h2 {
+            color: #2822c9;
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            padding-right: 40px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+
+        .toggle-password {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            font-size: 16px;
+            color: #888;
+            z-index: 20000;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #2822c9;
+            color: #fff;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            background-color: #1f1ca0;
+        }
+
+        .error-msg {
+            color: red;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .success-msg {
+            color: green;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        #loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        #loader img {
+            width: 60px;
+        }
+
+        .forgot-btn {
+            background: none;
+            border: none;
+            color: #2822c9;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: underline;
+        }
+
+        .forgot-btn:hover {
+            background-color: #1f1ca0;
+            color: white;
+        }
+    </style>
+
+    <!-- Font Awesome for eye icon -->
+    <script src="https://kit.fontawesome.com/a2c1f2ae50.js" crossorigin="anonymous"></script>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+</head>
+
+<body>
+    <div id="loader"><img src="assets/loader.gif" alt="Loading..." /></div>
+
+    <div class="container">
+        <h2>Login</h2>
+        <div class="error-msg" id="errorMsg"></div>
+        <div class="success-msg" id="successMsg"></div>
+        <form id="loginForm">
+            <div class="input-group">
+                <input type="email" id="email" placeholder="Email" required />
+            </div>
+            <div class="input-group">
+                <input type="password" id="password" placeholder="Password" required />
+                <i class="fas fa-eye toggle-password" id="togglePassword"></i>
+            </div>
+            <button type="submit">Login</button>
+            <button type="button" class="forgot-btn" id="forgotPasswordBtn">Forgot Password?</button>
+        </form>
+    </div>
+
+    <script>
+        // Firebase config
+        const firebaseConfig = {
+            apiKey: "AIzaSyA5aolkHTEzDnhF1Zh1sLEqAarRtpZ8oY4",
+            authDomain: "jollybee-2024.firebaseapp.com",
+            projectId: "jollybee-2024",
+            storageBucket: "jollybee-2024.appspot.com",
+            messagingSenderId: "370981953023",
+            appId: "1:370981953023:web:91857e6a3c7d1f33479bca"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        const loader = document.getElementById("loader");
+        const errorMsg = document.getElementById("errorMsg");
+        const successMsg = document.getElementById("successMsg");
+        const form = document.getElementById("loginForm");
+        const emailField = document.getElementById("email");
+        const passwordField = document.getElementById("password");
+        const togglePassword = document.getElementById("togglePassword");
+        const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
+
+        window.onload = () => {
+            loader.style.display = "none";
+        };
+
+        form.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            loader.style.display = "flex";
+            errorMsg.textContent = "";
+            successMsg.textContent = "";
+
+            try {
+                const email = emailField.value.trim();
+                const password = passwordField.value.trim();
+                await auth.signInWithEmailAndPassword(email, password);
+                window.location.href = "admin.html";
+            } catch (err) {
+                errorMsg.textContent = "Invalid email or password.";
+            } finally {
+                loader.style.display = "none";
+            }
+        });
+
+        togglePassword.addEventListener("click", () => {
+            const type = passwordField.type === "password" ? "text" : "password";
+            passwordField.type = type;
+            togglePassword.classList.toggle("fa-eye-slash");
+        });
+
+        forgotPasswordBtn.addEventListener("click", async () => {
+            const email = emailField.value.trim();
+            if (!email) {
+                errorMsg.textContent = "Please enter your email to reset password.";
+                return;
+            }
+
+            loader.style.display = "flex";
+            errorMsg.textContent = "";
+            successMsg.textContent = "";
+
+            try {
+                await auth.sendPasswordResetEmail(email);
+                successMsg.textContent = "Password reset email sent!";
+            } catch (err) {
+                errorMsg.textContent = "Unable to send reset email. Check the email address.";
+            } finally {
+                loader.style.display = "none";
+            }
+        });
+    </script>
+</body>
+
+</html>

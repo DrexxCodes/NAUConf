@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Secret Admin Signup</title>
+  <style>
+    body {
+      background-color: #111;
+      color: #f4f4f4;
+      font-family: monospace;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      color: #7a5af8;
+    }
+    p {
+      color: #ccc;
+    }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <div>
+    <h1>Welcome to Secret Signup</h1>
+    
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyA5aolkHTEzDnhF1Zh1sLEqAarRtpZ8oY4",
+      authDomain: "jollybee-2024.firebaseapp.com",
+      projectId: "jollybee-2024",
+      storageBucket: "jollybee-2024.appspot.com",
+      messagingSenderId: "370981953023",
+      appId: "1:370981953023:web:91857e6a3c7d1f33479bca"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    console.log('%c👋 Welcome Admin!', 'color: #7a5af8; font-size: 18px; font-weight: bold;');
+    console.log('%cTo create a new admin, run:\nsignup("Your Name", "your@email.com", "password123")', 'color: #ccc; font-size: 14px;');
+
+    async function signup(name, email, password) {
+      if (!name || !email || !password) {
+        console.error("⚠️ Please provide name, email, and password.");
+        return;
+      }
+
+      try {
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+
+        await db.collection("admins").doc(user.uid).set({
+          AdminName: name,
+          email: email,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        console.log(`✅ Signup successful! Admin "${name}" created with email ${email}`);
+      } catch (error) {
+        console.error("❌ Error during signup:", error.message);
+      }
+    }
+  </script>
+</body>
+</html>

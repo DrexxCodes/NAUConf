@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Panel</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f0f2f5;
+      padding: 30px;
+      margin: 0;
+      position: relative;
+    }
+    h1 {
+      color: #2822c9;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .card:hover {
+      transform: translateY(-5px);
+    }
+    .verified {
+      color: green;
+      font-weight: bold;
+    }
+    .not-verified {
+      color: red;
+      font-weight: bold;
+    }
+    #loader {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(255, 255, 255, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    #loader img {
+      width: 60px;
+      height: 60px;
+    }
+    .timestamp {
+      font-size: 13px;
+      color: #666;
+      margin-top: 10px;
+    }
+    #content {
+      display: none;
+    }
+    #loggedInUser {
+      text-align: center;
+      color: #444;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+  </style>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <div id="loader"><img src="assets/loader.gif" alt="Loading..." /></div>
+
+  <div id="content">
+    <h1>All Abstract Submissions</h1>
+    <p id="loggedInUser"></p>
+    <div class="grid" id="abstractGrid"></div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyA5aolkHTEzDnhF1Zh1sLEqAarRtpZ8oY4",
+      authDomain: "jollybee-2024.firebaseapp.com",
+      projectId: "jollybee-2024",
+      storageBucket: "jollybee-2024.appspot.com",
+      messagingSenderId: "370981953023",
+      appId: "1:370981953023:web:91857e6a3c7d1f33479bca"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    const abstractGrid = document.getElementById("abstractGrid");
+    const loader = document.getElementById("loader");
+    const content = document.getElementById("content");
+    const userInfo = document.getElementById("loggedInUser");
+
+    function formatTimestamp(timestamp) {
+      if (!timestamp) return "No date";
+      const date = timestamp.toDate();
+      return date.toLocaleString();
+    }
+
+    async function fetchAbstracts() {
+      try {
+        const snapshot = await db.collection("abstracts").orderBy("submittedAt", "desc").get();
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const div = document.createElement("div");
+          div.className = "card";
+          div.innerHTML = `
+            <h3>${data.fullName}</h3>
+            <p><strong>Title:</strong> ${data.title}</p>
+            <p class="${data.isVerified ? 'verified' : 'not-verified'}">
+              ${data.isVerified ? 'Verified' : 'Not Verified'}
+            </p>
+            <p class="timestamp">Submitted: ${formatTimestamp(data.submittedAt)}</p>
+          `;
+          div.addEventListener("click", () => {
+            window.location.href = `work.html?email=${encodeURIComponent(data.email)}`;
+          });
+          abstractGrid.appendChild(div);
+        });
+      } catch (err) {
+        alert("Error fetching abstracts: " + err.message);
+      } finally {
+        loader.style.display = "none";
+      }
+    }
+
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        userInfo.textContent = `Logged in as: ${user.email}`;
+        content.style.display = "block";
+        fetchAbstracts();
+      } else {
+        window.location.href = "login.html";
+      }
+    });
+  </script>
+</body>
+</html>
