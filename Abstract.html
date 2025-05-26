@@ -15,6 +15,7 @@
         min-height: 100vh;
         margin: 0;
         position: relative;
+        flex-direction: column;
       }
       .container {
         background: #ffffff;
@@ -113,11 +114,36 @@
         font-size: 14px;
         margin-bottom: 10px;
       }
+
+      .head {
+        display: flex;
+
+      }
+      .head p {
+        margin: 0;
+        font-weight: bold;
+        background: red;
+        color: white;
+        width: 50px;
+        text-align: center;
+        padding: 10px;
+      }
+
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
   </head>
   <body>
+    <!-- Marquee notice -->
+
+    <div class="head">
+      <p>Note</p>
+      <marquee behavior="scroll" direction="left" scrollamount="3" style="background-color:#2822c9; color:white; padding:10px; font-weight:bold;">
+        Deadline for submitting abstract: 16th of June. Notification for uploading paper starts 18th of June.
+      </marquee>
+    </div>
+
     <div id="loader"><img src="assets/loader.gif" alt="Loading..." /></div>
+
     <div class="container" style="display:none">
       <h2 class="title">Upload Abstract</h2>
       <form id="abstractForm">
@@ -126,14 +152,21 @@
         <input type="email" placeholder="Email" id="email" required />
         <input type="text" placeholder="Abstract Title" id="title" required />
 
-        <label style="display:block; text-align:left; width:90%; margin:0 auto 10px auto; font-size:14px; color:#555;">Upload Document (.docx, .txt, .pdf, .rtf)</label>
+        <label style="display:block; text-align:left; width:90%; margin:0 auto 10px auto; font-size:14px; color:#555;">
+          Upload Document (.docx only)
+        </label>
         <input type="file" id="fileInput" accept=".docx,.txt,.pdf,.rtf" />
 
         <textarea id="abstractText" placeholder="Type or upload your abstract..."></textarea>
-        <div class="word-count">Word Count: <span id="wordCount">0</span>/700</div>
+        <div class="word-count">Word Count: <span id="wordCount">0</span>/350</div>
 
         <button type="submit" id="submitBtn" disabled>Upload Abstract</button>
       </form>
+
+      <!-- Link to guidelines -->
+      <div style="margin-top: 20px; font-size: 14px; color: #333;">
+        Please refer to <a href="guidelines.html" style="color: #2822c9; text-decoration: underline;">guidelines</a> for abstract submission guidelines.
+      </div>
     </div>
 
     <script type="module">
@@ -169,14 +202,14 @@
         const count = getWordCount(textArea.value);
         wordCountEl.textContent = count;
 
-        if (count > 700) {
-          const words = textArea.value.trim().split(/\s+/).slice(0, 700);
+        if (count > 350) {
+          const words = textArea.value.trim().split(/\s+/).slice(0, 350);
           textArea.value = words.join(" ");
-          wordCountEl.textContent = 700;
+          wordCountEl.textContent = 350;
         }
 
         const newCount = getWordCount(textArea.value);
-        submitBtn.disabled = newCount === 0 || newCount > 700;
+        submitBtn.disabled = newCount === 0 || newCount > 350;
       }
 
       window.addEventListener("load", () => {
