@@ -1,0 +1,19 @@
+BEGIN:VCARD
+VERSION:3.0
+FN:John Doe
+NICKNAME:Johnny
+N:Doe;John;Sam;Engr.;
+GENDER:M
+TEL;TYPE=CELL:+1234567890
+TEL;TYPE=WORK,VOICE:+12384602890
+ORG:Rita's Bakery
+ROLE:CEO
+TITLE:Founder
+DEPT:Hoe
+EMAIL:johndoe@gmail.com
+URL:https://www.johndoe.com
+X-SOCIALPROFILE;type=X:https://x.com/johndoe
+X-SOCIALPROFILE;type=Facebook:https://facebook.com/johndoe
+ADR;TYPE=WORK:;;123 HTML street, CSS county;Paris;;145022;France
+ADR;TYPE=HOME:;;123 HTML street, CSS county;Lagos;;110022;Nigeria
+END:VCARD

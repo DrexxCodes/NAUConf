@@ -27,8 +27,12 @@
       border-radius: 8px;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
       padding: 20px;
-      cursor: pointer;
+      /* Removed cursor: pointer; from card as buttons handle interaction */
       transition: transform 0.2s;
+      position: relative; /* For paper status tag */
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
     .card:hover {
       transform: translateY(-5px);
@@ -69,6 +73,53 @@
       margin-bottom: 20px;
       font-size: 14px;
     }
+    .paper-status {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: #28a745; /* Green for "Paper Uploaded" */
+      color: white;
+      padding: 5px 8px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    .no-paper-status {
+      background-color: #ffc107; /* Orange for "No Paper" */
+    }
+    .card-buttons {
+      margin-top: 15px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+    .card-buttons button {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      transition: background-color 0.2s ease;
+    }
+    .card-buttons .view-abstract-btn {
+      background-color: #007bff; /* Blue for abstract */
+      color: white;
+    }
+    .card-buttons .view-abstract-btn:hover {
+      background-color: #0056b3;
+    }
+    .card-buttons .view-paper-btn {
+      background-color: #28a745; /* Green for paper */
+      color: white;
+    }
+    .card-buttons .view-paper-btn:hover {
+      background-color: #218838;
+    }
+    .card-buttons .view-paper-btn:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
   </style>
 
   <!-- Firebase SDKs -->
@@ -86,6 +137,7 @@
   </div>
 
   <script>
+    // Firebase configuration (replace with your actual config)
     const firebaseConfig = {
       apiKey: "AIzaSyA5aolkHTEzDnhF1Zh1sLEqAarRtpZ8oY4",
       authDomain: "jollybee-2024.firebaseapp.com",
@@ -95,54 +147,107 @@
       appId: "1:370981953023:web:91857e6a3c7d1f33479bca"
     };
 
+    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
+
+    // Get DOM elements
     const abstractGrid = document.getElementById("abstractGrid");
     const loader = document.getElementById("loader");
     const content = document.getElementById("content");
     const userInfo = document.getElementById("loggedInUser");
 
+    // Function to format Firebase Timestamps to a readable string
     function formatTimestamp(timestamp) {
       if (!timestamp) return "No date";
       const date = timestamp.toDate();
       return date.toLocaleString();
     }
 
-    async function fetchAbstracts() {
+    // Function to fetch all abstracts and their corresponding paper submission status
+    async function fetchAbstractsAndPapers() {
       try {
-        const snapshot = await db.collection("abstracts").orderBy("submittedAt", "desc").get();
-        snapshot.forEach(doc => {
-          const data = doc.data();
+        // Fetch all abstracts, ordered by submission time
+        const abstractSnapshot = await db.collection("abstracts").orderBy("submittedAt", "desc").get();
+        const paperPromises = [];
+        const abstractsData = [];
+
+        // Iterate through each abstract to store its data and prepare a promise to check for its paper
+        abstractSnapshot.forEach(doc => {
+          const abstractData = doc.data();
+          abstractsData.push(abstractData);
+          // Create a promise to get the corresponding paper document
+          paperPromises.push(db.collection("papers").doc(abstractData.email).get());
+        });
+
+        // Wait for all paper existence checks to complete
+        const paperSnaps = await Promise.all(paperPromises);
+
+        // Iterate through the abstracts and their paper statuses to render cards
+        abstractsData.forEach((abstractData, index) => {
+          const paperSnap = paperSnaps[index];
+          const hasPaper = paperSnap.exists; // Check if a paper exists for this abstract's email
+
           const div = document.createElement("div");
           div.className = "card";
           div.innerHTML = `
-            <h3>${data.fullName}</h3>
-            <p><strong>Title:</strong> ${data.title}</p>
-            <p class="${data.isVerified ? 'verified' : 'not-verified'}">
-              ${data.isVerified ? 'Verified' : 'Not Verified'}
-            </p>
-            <p class="timestamp">Submitted: ${formatTimestamp(data.submittedAt)}</p>
+            <div>
+              <h3>${abstractData.fullName}</h3>
+              <p><strong>Title:</strong> ${abstractData.title}</p>
+              <p class="${abstractData.isVerified ? 'verified' : 'not-verified'}">
+                ${abstractData.isVerified ? 'Verified' : 'Not Verified'}
+              </p>
+              <p class="timestamp">Submitted: ${formatTimestamp(abstractData.submittedAt)}</p>
+              <span class="paper-status ${hasPaper ? '' : 'no-paper-status'}">
+                ${hasPaper ? 'Paper Uploaded' : 'No Paper'}
+              </span>
+            </div>
+            <div class="card-buttons">
+              <button class="view-abstract-btn" data-email="${abstractData.email}">View Abstract</button>
+              <button class="view-paper-btn" data-email="${abstractData.email}" ${hasPaper ? '' : 'disabled'}>View Paper</button>
+            </div>
           `;
-          div.addEventListener("click", () => {
-            window.location.href = `work.html?email=${encodeURIComponent(data.email)}`;
+          
+          // Add event listeners for the new buttons
+          const viewAbstractBtn = div.querySelector('.view-abstract-btn');
+          viewAbstractBtn.addEventListener('click', () => {
+            window.location.href = `work.html?email=${encodeURIComponent(abstractData.email)}`;
           });
+
+          const viewPaperBtn = div.querySelector('.view-paper-btn');
+          viewPaperBtn.addEventListener('click', () => {
+            window.location.href = `paper-admin.html?email=${encodeURIComponent(abstractData.email)}`;
+          });
+
           abstractGrid.appendChild(div);
         });
       } catch (err) {
-        alert("Error fetching abstracts: " + err.message);
+        console.error("Error fetching data:", err);
+        // Display a custom error message box instead of alert()
+        const errorMessage = document.createElement('div');
+        errorMessage.style.cssText = `
+          position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+          background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;
+          padding: 20px; border-radius: 8px; z-index: 9999;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        `;
+        errorMessage.innerHTML = `<strong>Error:</strong> ${err.message}`;
+        document.body.appendChild(errorMessage);
+        setTimeout(() => errorMessage.remove(), 5000); // Remove message after 5 seconds
       } finally {
-        loader.style.display = "none";
+        loader.style.display = "none"; // Hide loader once data is fetched or error occurs
       }
     }
 
+    // Authenticate user on page load
     auth.onAuthStateChanged((user) => {
       if (user) {
         userInfo.textContent = `Logged in as: ${user.email}`;
-        content.style.display = "block";
-        fetchAbstracts();
+        content.style.display = "block"; // Show content once authenticated
+        fetchAbstractsAndPapers(); // Fetch data
       } else {
-        window.location.href = "login.html";
+        window.location.href = "login.html"; // Redirect to login if not authenticated
       }
     });
   </script>

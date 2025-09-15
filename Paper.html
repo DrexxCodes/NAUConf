@@ -73,19 +73,28 @@
       color: #555;
       margin: -10px 5% 15px auto;
     }
-          .head {
-        display: flex;
-
-      }
-      .head p {
-        margin: 0;
-        font-weight: bold;
-        background: red;
-        color: white;
-        width: 50px;
-        text-align: center;
-        padding: 10px;
-      }
+    .head {
+      display: flex;
+    }
+    .head p {
+      margin: 0;
+      font-weight: bold;
+      background: red;
+      color: white;
+      width: 50px;
+      text-align: center;
+      padding: 10px;
+    }
+    .success-message {
+      background: #d4edda;
+      border: 1px solid #28a745;
+      color: #155724;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+      text-align: center;
+      font-weight: bold;
+    }
   </style>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -93,23 +102,23 @@
 <body>
   <div class="container">
     <div class="head">
-    <p>Note</p>
-    <marquee behavior="scroll" direction="left" scrollamount="3" style="background-color:#2822c9; color:white; padding:10px; font-weight:bold;">
-      Deadline for submitting papers: 22nd of July. 
-    </marquee>
-  </div>
+      <p>Note</p>
+      <marquee behavior="scroll" direction="left" scrollamount="3" style="background-color:#2822c9; color:white; padding:10px; font-weight:bold;">
+        Deadline for submitting papers: 22nd of July.
+      </marquee>
+    </div>
     <h2 class="title">Upload Full Paper</h2>
     <input type="email" id="email" placeholder="Enter your email" required />
     <button id="checkBtn">Check Status</button>
 
     <div id="resultBlock"></div>
-          <!-- Link to guidelines -->
-      <div style="margin-top: 20px; font-size: 14px; color: #333;">
-        Please refer to <a href="guidelines.html" style="color: #2822c9; text-decoration: underline;">guidelines</a> for abstract submission guidelines.
-      </div>
+    <div style="margin-top: 20px; font-size: 14px; color: #333;">
+      Please refer to <a href="guidelines.html" style="color: #2822c9; text-decoration: underline;">guidelines</a> for abstract submission guidelines.
+    </div>
   </div>
 
   <script>
+    // Firebase configuration (replace with your actual config)
     const firebaseConfig = {
       apiKey: "AIzaSyA5aolkHTEzDnhF1Zh1sLEqAarRtpZ8oY4",
       authDomain: "jollybee-2024.firebaseapp.com",
@@ -119,39 +128,71 @@
       appId: "1:370981953023:web:91857e6a3c7d1f33479bca"
     };
 
+    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
+    // Get DOM elements
     const checkBtn = document.getElementById("checkBtn");
     const emailInput = document.getElementById("email");
     const resultBlock = document.getElementById("resultBlock");
 
+    // Function to count words in a given text
     function countWords(text) {
       return text.trim().split(/\s+/).filter(Boolean).length;
     }
 
+    // Event listener for the "Check Status" button
     checkBtn.addEventListener("click", async () => {
       const email = emailInput.value.trim();
-      if (!email) return alert("Please enter an email");
+      if (!email) {
+        // Display error message if email is empty
+        resultBlock.innerHTML = `<div class='message-block'>Please enter an email.</div>`;
+        return;
+      }
 
+      // Update button state while checking
       checkBtn.innerText = "Checking...";
       checkBtn.disabled = true;
-      resultBlock.innerHTML = "";
+      resultBlock.innerHTML = ""; // Clear previous results
 
       try {
-        const docRef = db.collection("abstracts").doc(email);
-        const docSnap = await docRef.get();
-        if (!docSnap.exists) {
+        // --- Step 1: Check for existing paper submission ---
+        const paperDocRef = db.collection("papers").doc(email);
+        const paperDocSnap = await paperDocRef.get();
+
+        if (paperDocSnap.exists) {
+          // If a paper already exists for this email, display a success message
+          const paperData = paperDocSnap.data();
+          resultBlock.innerHTML = `
+            <div class='success-message'>
+              You already have a paper for this conference titled <strong>"${paperData.title}"</strong>.
+              Submitted on: ${new Date(paperData.submittedAt.toDate()).toLocaleString()}
+            </div>`;
+          checkBtn.innerText = "Check Status";
+          checkBtn.disabled = false;
+          return; // Stop further execution as paper is already submitted
+        }
+
+        // --- Step 2: If no paper, check for abstract verification ---
+        const abstractDocRef = db.collection("abstracts").doc(email);
+        const abstractDocSnap = await abstractDocRef.get();
+
+        if (!abstractDocSnap.exists) {
+          // If no abstract found for the email
           resultBlock.innerHTML = `<div class='message-block'>No abstract found for this email.</div>`;
         } else {
-          const data = docSnap.data();
+          // If abstract found, get its data
+          const data = abstractDocSnap.data();
           if (!data.isVerified) {
+            // If abstract is not verified
             resultBlock.innerHTML = `
               <div class='message-block'>
                 Dear <strong>${data.fullName}</strong>, your abstract titled
                 <strong>${data.title}</strong> isn't verified for full paper submission.
               </div>`;
           } else {
+            // If abstract is verified, show the paper upload form
             resultBlock.innerHTML = `
               <input type="text" value="${data.title}" disabled />
               <textarea id="fullPaper" placeholder="Paste your full paper here..."></textarea>
@@ -159,42 +200,63 @@
               <button id="submitBtn" disabled>Upload Full Paper</button>
             `;
 
+            // Get elements for the paper upload form
             const textarea = document.getElementById("fullPaper");
             const wordCountEl = document.getElementById("wordCount");
             const submitBtn = document.getElementById("submitBtn");
 
+            // Event listener for textarea input to update word count and enable/disable submit button
             textarea.addEventListener("input", () => {
               const count = countWords(textarea.value);
+              // Truncate text if it exceeds 7000 words
               if (count > 7000) {
                 textarea.value = textarea.value.trim().split(/\s+/).slice(0, 7000).join(" ");
               }
               wordCountEl.textContent = countWords(textarea.value);
-              submitBtn.disabled = countWords(textarea.value) === 0;
+              submitBtn.disabled = countWords(textarea.value) === 0; // Disable if word count is 0
             });
 
+            // Event listener for the "Upload Full Paper" button
             submitBtn.addEventListener("click", async () => {
               submitBtn.innerText = "Uploading...";
               submitBtn.disabled = true;
-              await db.collection("papers").doc(email).set({
-                email,
-                title: data.title,
-                fullName: data.fullName,
-                paper: textarea.value
-              });
-              alert("Paper uploaded successfully!");
-              submitBtn.innerText = "Upload Full Paper";
-              textarea.value = "";
-              wordCountEl.textContent = 0;
+              try {
+                // Save the full paper to Firestore
+                await db.collection("papers").doc(email).set({
+                  email,
+                  title: data.title,
+                  fullName: data.fullName,
+                  paper: textarea.value,
+                  submittedAt: firebase.firestore.FieldValue.serverTimestamp() // Store server timestamp
+                });
+                // Display success message after upload
+                resultBlock.innerHTML = `
+                  <div class='success-message'>
+                    Paper uploaded successfully!
+                  </div>`;
+                textarea.value = ""; // Clear textarea
+                wordCountEl.textContent = 0; // Reset word count
+                // Optionally, hide the form elements after successful upload
+                document.getElementById('fullPaper').style.display = 'none';
+                document.querySelector('.word-count').style.display = 'none';
+                submitBtn.style.display = 'none';
+              } catch (uploadErr) {
+                console.error("Error uploading paper:", uploadErr);
+                resultBlock.innerHTML = `<div class='message-block'>An error occurred during upload: ${uploadErr.message}</div>`;
+              } finally {
+                submitBtn.innerText = "Upload Full Paper";
+                submitBtn.disabled = false;
+              }
             });
           }
         }
       } catch (err) {
-        console.error(err);
-        alert("An error occurred while checking status.");
+        console.error("Error checking status:", err);
+        resultBlock.innerHTML = `<div class='message-block'>An error occurred while checking status: ${err.message}</div>`;
+      } finally {
+        checkBtn.innerText = "Check Status";
+        checkBtn.disabled = false;
       }
-
-      checkBtn.innerText = "Check Status";
-      checkBtn.disabled = false;
     });
   </script>
 </body>

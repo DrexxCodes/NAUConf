@@ -67,9 +67,16 @@
       border-radius: 5px;
       font-size: 16px;
       cursor: pointer;
+      margin-bottom: 10px;
     }
     button:hover {
       background-color: #1f1ea6;
+    }
+    .download-btn {
+      background-color: #28a745;
+    }
+    .download-btn:hover {
+      background-color: #218838;
     }
     .timestamp {
       font-size: 13px;
@@ -112,9 +119,18 @@
       font-weight: bold;
       display: none;
     }
+    #downloadLoader {
+      display: none;
+      text-align: center;
+      margin-top: 10px;
+      color: #2822c9;
+      font-size: 14px;
+    }
   </style>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
 </head>
 <body>
   <div id="loader"><img src="assets/loader.gif" alt="Loading..." /></div>
@@ -137,6 +153,13 @@
     <textarea id="work" disabled></textarea>
 
     <div class="timestamp" id="timestamp"></div>
+
+    <button id="downloadBtn" class="download-btn">
+      <i class="fas fa-download"></i> Download as Word Document
+    </button>
+    <div id="downloadLoader">
+      <i class="fas fa-spinner fa-spin"></i> Generating document...
+    </div>
 
     <button id="verifyBtn">Mark as Verified</button>
     <div class="success-message" id="successMsg">✅ Abstract marked as verified</div>
@@ -163,24 +186,28 @@
   const titleField = document.getElementById('title');
   const workField = document.getElementById('work');
   const verifyBtn = document.getElementById('verifyBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
   const timestampEl = document.getElementById('timestamp');
   const loader = document.getElementById('loader');
+  const downloadLoader = document.getElementById('downloadLoader');
   const container = document.querySelector('.container');
   const successMsg = document.getElementById('successMsg');
+
+  let abstractData = null;
 
   async function loadData() {
     if (!email) return alert("Email not found in query params");
     const docRef = db.collection("abstracts").doc(email);
     const docSnap = await docRef.get();
     if (docSnap.exists) {
-      const data = docSnap.data();
-      fullNameField.value = data.fullName;
-      emailField.value = data.email;
-      titleField.value = data.title;
-      workField.value = data.work;
+      abstractData = docSnap.data();
+      fullNameField.value = abstractData.fullName;
+      emailField.value = abstractData.email;
+      titleField.value = abstractData.title;
+      workField.value = abstractData.work;
 
-      if (data.submittedAt?.toDate) {
-        const date = data.submittedAt.toDate();
+      if (abstractData.submittedAt?.toDate) {
+        const date = abstractData.submittedAt.toDate();
         const formatted = date.toLocaleString("en-GB", {
           day: "2-digit", month: "short", year: "numeric",
           hour: "2-digit", minute: "2-digit", second: "2-digit"
@@ -188,7 +215,7 @@
         timestampEl.textContent = `Submitted: ${formatted}`;
       }
 
-      if (data.isVerified) {
+      if (abstractData.isVerified) {
         verifyBtn.style.display = "none";
         successMsg.style.display = "block";
       } else {
@@ -202,6 +229,170 @@
     container.style.display = "block";
   }
 
+  function sanitizeFilename(filename) {
+    // Remove or replace characters that are invalid in filenames
+    return filename.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_').substring(0, 100);
+  }
+
+  async function downloadWordDocument() {
+    if (!abstractData) return;
+
+    downloadLoader.style.display = "block";
+    downloadBtn.disabled = true;
+
+    try {
+      // Check if docx library is available
+      if (typeof docx === 'undefined') {
+        throw new Error('DOCX library not loaded');
+      }
+
+      // Create a new document
+      const doc = new docx.Document({
+        sections: [
+          {
+            properties: {},
+            children: [
+              // Title
+              new docx.Paragraph({
+                children: [
+                  new docx.TextRun({
+                    text: abstractData.title || "Abstract Title",
+                    bold: true,
+                    size: 32, // 16pt
+                    color: "2822c9"
+                  })
+                ],
+                alignment: docx.AlignmentType.CENTER,
+                spacing: { after: 400 }
+              }),
+
+              // Author Information Section
+              new docx.Paragraph({
+                children: [
+                  new docx.TextRun({
+                    text: "Author Information",
+                    bold: true,
+                    size: 24, // 12pt
+                    underline: {}
+                  })
+                ],
+                spacing: { before: 200, after: 200 }
+              }),
+
+              // Full Name
+              new docx.Paragraph({
+                children: [
+                  new docx.TextRun({
+                    text: "Full Name: ",
+                    bold: true
+                  }),
+                  new docx.TextRun({
+                    text: abstractData.fullName || "N/A"
+                  })
+                ],
+                spacing: { after: 100 }
+              }),
+
+              // Email
+              new docx.Paragraph({
+                children: [
+                  new docx.TextRun({
+                    text: "Email: ",
+                    bold: true
+                  }),
+                  new docx.TextRun({
+                    text: abstractData.email || "N/A"
+                  })
+                ],
+                spacing: { after: 300 }
+              }),
+
+              // Abstract Content Section
+              new docx.Paragraph({
+                children: [
+                  new docx.TextRun({
+                    text: "Abstract",
+                    bold: true,
+                    size: 24, // 12pt
+                    underline: {}
+                  })
+                ],
+                spacing: { before: 200, after: 200 }
+              }),
+
+              // Abstract text with proper formatting
+              new docx.Paragraph({
+                children: [
+                  new docx.TextRun({
+                    text: abstractData.work || "No abstract content available.",
+                    size: 22 // 11pt
+                  })
+                ],
+                spacing: { after: 200 },
+                alignment: docx.AlignmentType.JUSTIFIED
+              }),
+
+              // Submission timestamp (if available)
+              ...(abstractData.submittedAt ? [
+                new docx.Paragraph({
+                  children: [
+                    new docx.TextRun({
+                      text: `Submitted: ${abstractData.submittedAt.toDate().toLocaleString("en-GB", {
+                        day: "2-digit", month: "short", year: "numeric",
+                        hour: "2-digit", minute: "2-digit"
+                      })}`,
+                      italics: true,
+                      size: 18, // 9pt
+                      color: "666666"
+                    })
+                  ],
+                  alignment: docx.AlignmentType.RIGHT,
+                  spacing: { before: 400 }
+                })
+              ] : [])
+            ]
+          }
+        ]
+      });
+
+      // Generate and download the document
+      const blob = await docx.Packer.toBlob(doc);
+      const filename = sanitizeFilename(abstractData.title || "Abstract") + ".docx";
+      
+      saveAs(blob, filename);
+
+    } catch (error) {
+      console.error("Error generating document:", error);
+      
+      // Fallback: Create a simple text document if DOCX fails
+      if (error.message === 'DOCX library not loaded') {
+        try {
+          const content = `${abstractData.title || 'Abstract Title'}\n\n` +
+                         `Author Information:\n` +
+                         `Full Name: ${abstractData.fullName || 'N/A'}\n` +
+                         `Email: ${abstractData.email || 'N/A'}\n\n` +
+                         `Abstract:\n${abstractData.work || 'No abstract content available.'}\n\n` +
+                         (abstractData.submittedAt ? 
+                          `Submitted: ${abstractData.submittedAt.toDate().toLocaleString("en-GB")}\n` : '');
+          
+          const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+          const filename = sanitizeFilename(abstractData.title || "Abstract") + ".txt";
+          saveAs(blob, filename);
+          
+          alert("Word document generation failed. Downloaded as text file instead.");
+          return;
+        } catch (fallbackError) {
+          console.error("Fallback also failed:", fallbackError);
+        }
+      }
+      
+      alert("Failed to generate document. Please try again or check your internet connection.");
+    } finally {
+      downloadLoader.style.display = "none";
+      downloadBtn.disabled = false;
+    }
+  }
+
   verifyBtn.addEventListener("click", async () => {
     loader.style.display = "flex"; // show preloader
     try {
@@ -209,12 +400,15 @@
       await db.collection("abstracts").doc(email).update({ isVerified: true });
       verifyBtn.style.display = "none";
       successMsg.style.display = "block";
+      abstractData.isVerified = true; // Update local data
     } catch (err) {
       alert("Failed to verify abstract.");
     } finally {
       loader.style.display = "none"; // hide preloader after update
     }
   });
+
+  downloadBtn.addEventListener("click", downloadWordDocument);
 
   window.onload = loadData;
 </script>

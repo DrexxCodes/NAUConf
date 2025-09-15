@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paper Details - Admin</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f0f2f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .container {
+      background: #ffffff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+      max-width: 800px;
+      width: 100%;
+      animation: fadeIn 0.6s ease-in-out;
+    }
+    @keyframes fadeIn {
+      0% {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .title {
+      color: #2822c9;
+      font-size: 28px;
+      margin-bottom: 20px;
+      font-weight: bold;
+      text-align: center;
+    }
+    .detail-item {
+      margin-bottom: 15px;
+    }
+    .detail-item strong {
+      color: #333;
+      font-size: 18px;
+      display: block;
+      margin-bottom: 5px;
+    }
+    .detail-item span, .detail-item p {
+      color: #555;
+      font-size: 16px;
+      line-height: 1.6;
+      white-space: pre-wrap; /* Preserve whitespace and line breaks */
+      word-wrap: break-word; /* Break long words */
+    }
+    .paper-content {
+      background-color: #f9f9f9;
+      border: 1px solid #e0e0e0;
+      padding: 20px;
+      border-radius: 8px;
+      margin-top: 20px;
+      max-height: 400px; /* Limit height for scroll */
+      overflow-y: auto; /* Add scroll for long papers */
+    }
+    button {
+      background-color: #28a745; /* Green for download */
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      border-radius: 6px;
+      font-size: 16px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-top: 20px;
+      display: block;
+      width: fit-content;
+      margin-left: auto;
+      margin-right: auto;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #218838;
+    }
+    #loader {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(255, 255, 255, 0.8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    #loader img {
+      width: 60px;
+      height: 60px;
+    }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <!-- FileSaver.js for client-side file saving -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head>
+<body>
+  <div id="loader"><img src="assets/loader.gif" alt="Loading..." /></div>
+
+  <div class="container" id="paperDetailsContainer" style="display: none;">
+    <h2 class="title">Full Paper Details</h2>
+    <div class="detail-item">
+      <strong>Full Name:</strong> <span id="fullName"></span>
+    </div>
+    <div class="detail-item">
+      <strong>Email:</strong> <span id="email"></span>
+    </div>
+    <div class="detail-item">
+      <strong>Abstract Title:</strong> <span id="abstractTitle"></span>
+    </div>
+    <div class="detail-item">
+      <strong>Submitted On:</strong> <span id="submittedAt"></span>
+    </div>
+    <div class="detail-item">
+      <strong>Paper Content:</strong>
+      <div id="paperContent" class="paper-content"></div>
+    </div>
+    <button id="downloadPaperBtn">Download Paper as Word File</button>
+  </div>
+
+  <script>
+    // Firebase configuration (replace with your actual config)
+    const firebaseConfig = {
+      apiKey: "AIzaSyA5aolkHTEzDnhF1Zh1sLEqAarRtpZ8oY4",
+      authDomain: "jollybee-2024.firebaseapp.com",
+      projectId: "jollybee-2024",
+      storageBucket: "jollybee-2024.appspot.com",
+      messagingSenderId: "370981953023",
+      appId: "1:370981953023:web:91857e6a3c7d1f33479bca"
+    };
+
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // Get DOM elements
+    const loader = document.getElementById("loader");
+    const paperDetailsContainer = document.getElementById("paperDetailsContainer");
+    const fullNameEl = document.getElementById("fullName");
+    const emailEl = document.getElementById("email");
+    const abstractTitleEl = document.getElementById("abstractTitle");
+    const submittedAtEl = document.getElementById("submittedAt");
+    const paperContentEl = document.getElementById("paperContent");
+    const downloadPaperBtn = document.getElementById("downloadPaperBtn");
+
+    // Function to get query parameter from URL
+    function getQueryParam(name) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(name);
+    }
+
+    // Function to format Firebase Timestamps or Date objects
+    function formatTimestamp(timestamp) {
+      if (!timestamp) return "N/A";
+      // Check if it's a Firebase Timestamp object and convert to Date
+      if (typeof timestamp.toDate === 'function') {
+        return timestamp.toDate().toLocaleString();
+      }
+      // If it's already a Date object or string, convert to locale string
+      return new Date(timestamp).toLocaleString();
+    }
+
+    // Function to fetch and display paper details
+    async function fetchPaperDetails() {
+      const email = getQueryParam("email"); // Get email from URL query parameter
+      if (!email) {
+        // Display error if email parameter is missing
+        const errorMessage = document.createElement('div');
+        errorMessage.style.cssText = `
+          position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+          background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;
+          padding: 20px; border-radius: 8px; z-index: 9999;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        `;
+        errorMessage.innerHTML = `<strong>Error:</strong> Email parameter missing in URL.`;
+        document.body.appendChild(errorMessage);
+        setTimeout(() => errorMessage.remove(), 5000); // Remove message after 5 seconds
+        loader.style.display = "none"; // Hide loader
+        return;
+      }
+
+      try {
+        const paperDocRef = db.collection("papers").doc(email);
+        const paperDocSnap = await paperDocRef.get();
+
+        if (paperDocSnap.exists) {
+          // If paper found, populate the details
+          const data = paperDocSnap.data();
+          fullNameEl.textContent = data.fullName;
+          emailEl.textContent = data.email;
+          abstractTitleEl.textContent = data.title;
+          submittedAtEl.textContent = formatTimestamp(data.submittedAt);
+          paperContentEl.textContent = data.paper; // Display raw text content
+
+          paperDetailsContainer.style.display = "block"; // Show the container
+        } else {
+          // Display error if no paper found for the email
+          const errorMessage = document.createElement('div');
+          errorMessage.style.cssText = `
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;
+            padding: 20px; border-radius: 8px; z-index: 9999;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+          `;
+          errorMessage.innerHTML = `<strong>Error:</strong> No paper found for email: ${email}`;
+          document.body.appendChild(errorMessage);
+          setTimeout(() => errorMessage.remove(), 5000);
+        }
+      } catch (err) {
+        console.error("Error fetching paper details:", err);
+        // Display a general error message
+        const errorMessage = document.createElement('div');
+        errorMessage.style.cssText = `
+          position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+          background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;
+          padding: 20px; border-radius: 8px; z-index: 9999;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        `;
+        errorMessage.innerHTML = `<strong>Error:</strong> An error occurred: ${err.message}`;
+        document.body.appendChild(errorMessage);
+        setTimeout(() => errorMessage.remove(), 5000);
+      } finally {
+        loader.style.display = "none"; // Hide loader
+      }
+    }
+
+    // Event listener for the "Download Paper" button
+    downloadPaperBtn.addEventListener("click", () => {
+      // Get the displayed content
+      const fullName = fullNameEl.textContent;
+      const email = emailEl.textContent;
+      const title = abstractTitleEl.textContent;
+      const paper = paperContentEl.textContent;
+
+      // Create HTML content that can be saved as a .doc file
+      const docContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>${title}</title>
+            <style>
+                body { font-family: 'Times New Roman', serif; margin: 1in; }
+                h1 { font-size: 24pt; text-align: center; margin-bottom: 20pt; }
+                h2 { font-size: 18pt; margin-top: 20pt; margin-bottom: 10pt; }
+                p { font-size: 12pt; line-height: 1.5; margin-bottom: 10pt; }
+                .meta-info { font-size: 10pt; color: #666; margin-bottom: 15pt; }
+                .meta-info strong { color: #333; }
+            </style>
+        </head>
+        <body>
+            <h1>${title}</h1>
+            <div class="meta-info">
+                <p><strong>Author:</strong> ${fullName}</p>
+                <p><strong>Email:</strong> ${email}</p>
+                <p><strong>Submitted On:</strong> ${submittedAtEl.textContent}</p>
+            </div>
+            <h2>Full Paper</h2>
+            <p>${paper.replace(/\n/g, '<br>')}</p>
+        </body>
+        </html>
+      `;
+
+      // Create a Blob from the HTML content with MS Word MIME type
+      const blob = new Blob([docContent], { type: "application/msword;charset=utf-8" });
+      // Sanitize filename for download
+      const fileName = `${fullName}_${title.replace(/[^a-z0-9]/gi, '_')}.doc`;
+      // Use FileSaver.js to save the file
+      saveAs(blob, fileName);
+    });
+
+    // Fetch paper details when the page loads
+    fetchPaperDetails();
+  </script>
+</body>
+</html>
